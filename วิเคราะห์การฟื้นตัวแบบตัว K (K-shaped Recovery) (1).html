@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>วิเคราะห์การฟื้นตัวแบบตัว K (K-shaped Recovery)</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f3f5f9;--card:#fff;--tx:#1d2433;--mu:#667085;--bd:#dde2ec;--pr:#2563eb;--up:#16a34a;--dn:#dc2626}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10141c;--card:#1a2130;--tx:#e6eaf2;--mu:#9aa4b8;--bd:#2c3649;--pr:#5b8cff}}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:'Noto Sans Thai',system-ui,sans-serif;line-height:1.6}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem;margin:.2em 0}h2{font-size:1.1rem;margin:0 0 10px}
+.sub{color:var(--mu);margin:0 0 14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:14px}
+label{display:block;font-weight:600;font-size:.9rem;margin:8px 0 4px}
+input[type=text],textarea,select{width:100%;padding:9px 11px;border:1px solid var(--bd);border-radius:9px;background:var(--bg);color:var(--tx);font:inherit}
+textarea{min-height:150px;font-family:ui-monospace,monospace;font-size:.9rem}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+button{font:inherit;cursor:pointer;border:0;border-radius:9px;padding:9px 15px;background:var(--pr);color:#fff;font-weight:600}
+button.sec{background:transparent;color:var(--pr);border:1px solid var(--pr)}
+button.red{background:var(--dn)}button.grn{background:var(--up)}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.ac{position:relative}
+#list{position:absolute;left:0;right:0;top:100%;z-index:20;background:var(--card);border:1px solid var(--bd);border-radius:9px;max-height:240px;overflow:auto;display:none;box-shadow:0 8px 24px #0003}
+#list div{padding:8px 12px;cursor:pointer}#list div:hover,#list div.on{background:var(--pr);color:#fff}
+.hint{font-size:.82rem;color:var(--mu)}
+.paper{background:#fff;color:#1d2433;padding:14px;border-radius:10px;border:1px solid #dde2ec}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{border:1px solid #cfd6e4;padding:6px 8px;text-align:right;white-space:nowrap}
+th{background:#eaf0ff}td:first-child,th:first-child{text-align:center}
+.scroll{overflow-x:auto}
+.explain{font-size:.9rem;margin-top:10px}.explain li{margin:3px 0}
+.verdict{padding:10px 14px;border-radius:10px;font-weight:600;margin-bottom:10px;background:#eaf0ff}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:800px){.charts{grid-template-columns:1fr}}
+.ch{background:#fff;color:#1d2433;border:1px solid var(--bd);border-radius:12px;padding:12px}
+.ch h3{font-size:.95rem;margin:0 0 6px}.ch canvas{max-height:300px}
+.ch .row{margin-top:6px}.ch label{display:inline-flex;align-items:center;gap:5px;margin:0;font-weight:400}
+img.pv{max-width:100%;max-height:200px;margin-top:8px;border-radius:8px;border:1px solid var(--bd)}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}.lang{display:flex;gap:6px}.lang button{padding:6px 14px}.lang button.act{background:var(--pr);color:#fff}
+.hide{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="top"><h1>📈 วิเคราะห์การฟื้นตัวแบบตัว K (K-shaped Recovery)</h1><div class="lang"><button class="sec act" id="lth">ไทย</button><button class="sec" id="len">English</button></div></div>
+<p class="sub">เปรียบเทียบกลุ่มที่ฟื้นตัวขึ้น (ขาบนของตัว K) กับกลุ่มที่ตกต่ำลง (ขาล่างของตัว K) หลังวิกฤต</p>
+
+<div class="card">
+<h2>1) ข้อมูลนำเข้า</h2>
+<div class="grid">
+<div class="ac"><label for="country">ประเทศที่ใช้วิเคราะห์ (พิมพ์ตัวอักษรแรกเพื่อค้นหา)</label>
+<input type="text" id="country" placeholder="เช่น ไ → ไทย, U → United States" autocomplete="off">
+<div id="list"></div><div class="hint" id="cnt"></div></div>
+<div><label for="ind">ตัวชี้วัด</label>
+<select id="ind"><option>รายได้เฉลี่ยต่อเดือน</option><option>ความมั่งคั่ง/ทรัพย์สิน</option><option>การบริโภคต่อคน</option><option>ผลตอบแทนธุรกิจ/ยอดขาย</option><option>การจ้างงาน (ดัชนี)</option><option>อื่น ๆ</option></select></div>
+<div><label for="gu">ชื่อกลุ่มขาบน (ฟื้นตัว)</label><input type="text" id="gu" value="กลุ่มรายได้สูง"></div>
+<div><label for="gl">ชื่อกลุ่มขาล่าง (ตกต่ำ)</label><input type="text" id="gl" value="กลุ่มรายได้ต่ำ"></div>
+</div>
+<label for="data">ข้อมูล (1 บรรทัด = ป้ายปี/ช่วงเวลา, ค่ากลุ่มขาบน, ค่ากลุ่มขาล่าง คั่นด้วยจุลภาค/ช่องว่าง/แท็บ; ใส่ได้ตั้งแต่ 3 บรรทัด)</label>
+<textarea id="data" placeholder="2019,80,20&#10;2020,85,18&#10;2021,95,17"></textarea>
+<div class="row">
+<button class="sec" id="sample">🧪 ทดลองข้อมูลตัวอย่าง</button>
+<label class="sec" style="margin:0;padding:9px 15px;border:1px solid var(--pr);border-radius:9px;color:var(--pr);cursor:pointer">🖼️ แนบไฟล์ PNG<input type="file" id="png" accept="image/png" class="hide"></label>
+<button id="run" class="grn">⚙️ ประมวลผลข้อมูล</button>
+<button id="reset" class="red">🔄 Reset หน้า</button>
+</div>
+<img id="pv" class="pv hide" alt="ภาพที่แนบ">
+<div class="hint" id="msg"></div>
+</div>
+
+<div id="out" class="hide">
+<div class="card">
+<h2>2) เลือกรูปแบบการแสดงผล</h2>
+<div class="row" style="margin-top:0">
+<button id="bt">📋 ประมวลผลตาราง</button>
+<button id="bg">📊 แสดงผลเป็นกราฟ</button>
+</div></div>
+
+<div class="card hide" id="tcard">
+<h2>ตารางสถิติวิเคราะห์</h2>
+<div class="paper" id="paper">
+<div id="ttitle" style="font-weight:700;margin-bottom:6px"></div>
+<div class="verdict" id="verdict"></div>
+<div class="scroll"><table id="tbl1"></table></div>
+<div style="height:12px"></div>
+<div class="scroll"><table id="tbl2"></table></div>
+<ul class="explain" id="expl"></ul>
+</div>
+<div class="row"><button onclick="dlTable()">⬇️ ดาวน์โหลดตาราง PNG</button><button class="grn" onclick="dlXlsx()">⬇️ ดาวน์โหลด Excel</button></div>
+</div>
+
+<div class="card hide" id="gcard">
+<h2>กราฟวิเคราะห์</h2>
+<div class="charts" id="charts"></div>
+</div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const CODES="AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW".split(" ");
+let COUNTRIES=[];
+try{const th=new Intl.DisplayNames(['th'],{type:'region'}),en=new Intl.DisplayNames(['en'],{type:'region'});
+CODES.forEach(c=>{const t=th.of(c),e=en.of(c);if(t&&e&&t!==c)COUNTRIES.push({c,t,e})});}catch(e){CODES.forEach(c=>COUNTRIES.push({c,t:c,e:c}))}
+COUNTRIES.sort((a,b)=>a.t.localeCompare(b.t,'th'));
+$('cnt').textContent='มีรายชื่อประเทศ/ดินแดน '+COUNTRIES.length+' รายการ';
+let picked=null,cur=-1;
+const inp=$('country'),list=$('list');
+function show(){const q=inp.value.trim().toLowerCase();list.innerHTML='';cur=-1;
+if(!q){list.style.display='none';return}
+const m=COUNTRIES.filter(x=>x.t.toLowerCase().startsWith(q)||x.e.toLowerCase().startsWith(q)).concat(COUNTRIES.filter(x=>!x.t.toLowerCase().startsWith(q)&&!x.e.toLowerCase().startsWith(q)&&(x.t.toLowerCase().includes(q)||x.e.toLowerCase().includes(q))));
+m.slice(0,60).forEach(x=>{const d=document.createElement('div');d.textContent=nm(x);d.onmousedown=ev=>{ev.preventDefault();pick(x)};list.appendChild(d)});
+list.style.display=m.length?'block':'none';}
+function pick(x){picked=x;inp.value=nm(x);list.style.display='none'}
+inp.addEventListener('input',()=>{picked=null;show()});
+inp.addEventListener('focus',show);inp.addEventListener('blur',()=>setTimeout(()=>list.style.display='none',100));
+inp.addEventListener('keydown',e=>{const it=[...list.children];if(!it.length)return;
+if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();cur=(cur+(e.key==='ArrowDown'?1:-1)+it.length)%it.length;it.forEach((d,i)=>d.classList.toggle('on',i===cur));it[cur].scrollIntoView({block:'nearest'})}
+else if(e.key==='Enter'){e.preventDefault();(it[cur>=0?cur:0]).dispatchEvent(new MouseEvent('mousedown'))}});
+
+$('sample').onclick=()=>{$('data').value="2018,80,20\n2019,85,20.5\n2020,86,18\n2021,95,17.2\n2022,102,17.6\n2023,108,18\n2024,114,17.8\n2025,120,17.6";
+if(!picked){pick(COUNTRIES.find(x=>x.c==='TH')||COUNTRIES[0])}$('msg').textContent='โหลดข้อมูลตัวอย่างแล้ว (ข้อมูลสมมติ) กดประมวลผลได้เลย'};
+$('png').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('pv').src=r.result;$('pv').classList.remove('hide')};r.readAsDataURL(f)};
+
+let D=null,charts=[];
+const f2=v=>isFinite(v)?(Math.round(v*100)/100).toLocaleString('en-US'):'-';
+const mean=a=>a.reduce((s,v)=>s+v,0)/a.length;
+const sd=a=>{const m=mean(a);return Math.sqrt(a.reduce((s,v)=>s+(v-m)**2,0)/(a.length-1))};
+function corr(a,b){const ma=mean(a),mb=mean(b);let n=0,x=0,y=0;a.forEach((v,i)=>{n+=(v-ma)*(b[i]-mb);x+=(v-ma)**2;y+=(b[i]-mb)**2});return n/Math.sqrt(x*y)}
+function parse(){const rows=[];$('data').value.split(/[\n;]+/).forEach(l=>{const p=l.trim().split(/[,\t ]+/);if(p.length<3)return;const u=parseFloat(p[1]),w=parseFloat(p[2]);if(isNaN(u)||isNaN(w))return;rows.push({y:p[0],u,l:w})});return rows}
+$('run').onclick=()=>{
+if(!picked){$('msg').textContent='⚠️ กรุณาเลือกประเทศจากรายการที่เด้งขึ้นมา';return}
+const r=parse();if(r.length<3){$('msg').textContent='⚠️ ต้องมีข้อมูลอย่างน้อย 3 บรรทัด (ป้าย, ค่ากลุ่มบน, ค่ากลุ่มล่าง) และค่าต้องเป็นตัวเลขมากกว่า 0';return}
+if(r.some(x=>x.u<=0||x.l<=0)){$('msg').textContent='⚠️ ค่าต้องมากกว่า 0';return}
+const u0=r[0].u,l0=r[0].l;
+r.forEach((x,i)=>{x.ui=x.u/u0*100;x.li=x.l/l0*100;x.gap=x.ui-x.li;x.ratio=x.u/x.l;x.share=x.u/(x.u+x.l)*100;
+x.yu=i?(x.u/r[i-1].u-1)*100:null;x.yl=i?(x.l/r[i-1].l-1)*100:null});
+const n=r.length-1,L=r[n];
+const cu=(Math.pow(L.u/u0,1/n)-1)*100,cl=(Math.pow(L.l/l0,1/n)-1)*100;
+let v,t;
+if(L.ui>105&&L.li<95){v='✅ เข้าข่ายการฟื้นตัวแบบตัว K ชัดเจน';t='กลุ่มบนสูงกว่าฐาน แต่กลุ่มล่างต่ำกว่าฐาน'}
+else if(L.ui>100&&L.li>100&&L.gap>15){v='⚠️ แยกทางกันบางส่วน (คล้าย K แบบอ่อน)';t='ทั้งสองกลุ่มเพิ่มขึ้น แต่กลุ่มบนโตเร็วกว่ามาก'}
+else if(L.ui<100&&L.li<100){v='❌ ไม่ใช่ตัว K (ทั้งสองกลุ่มยังต่ำกว่าฐาน)';t='เข้าข่ายการฟื้นตัวช้า/แบบ L มากกว่า'}
+else{v='❌ ไม่เข้าข่ายตัว K';t='ช่องว่างระหว่างกลุ่มไม่ถ่างออกมากพอ'}
+D={r,u0,l0,L,n,cu,cl,v,t,corr:corr(r.map(x=>x.u),r.map(x=>x.l)),
+su:{m:mean(r.map(x=>x.u)),s:sd(r.map(x=>x.u))},sl:{m:mean(r.map(x=>x.l)),s:sd(r.map(x=>x.l))},
+gu:$('gu').value||'กลุ่มบน',gl:$('gl').value||'กลุ่มล่าง',name:nm(picked),pk:picked,ind:$('ind').value};
+$('out').classList.remove('hide');$('tcard').classList.add('hide');$('gcard').classList.add('hide');
+$('msg').textContent='✅ ประมวลผลข้อมูลสำเร็จ เลือกแสดงเป็นตารางหรือกราฟด้านล่าง';$('out').scrollIntoView({behavior:'smooth'})};
+
+$('bt').onclick=()=>{if(!D)return;const{r,L,n}=D;
+$('tcard').classList.remove('hide');
+$('ttitle').textContent='ประเทศ: '+D.name+' | ตัวชี้วัด: '+D.ind+' | ฐาน = '+r[0].y+' (ดัชนี=100)';
+$('verdict').textContent=D.v+' — '+D.t;
+let h='<tr><th>ช่วงเวลา</th><th>'+D.gu+'</th><th>'+D.gl+'</th><th>ดัชนีบน</th><th>ดัชนีล่าง</th><th>ส่วนต่างดัชนี</th><th>อัตราส่วน บน/ล่าง</th><th>สัดส่วนบน (%)</th><th>% เปลี่ยนแปลงบน</th><th>% เปลี่ยนแปลงล่าง</th></tr>';
+r.forEach(x=>h+='<tr><td>'+x.y+'</td><td>'+f2(x.u)+'</td><td>'+f2(x.l)+'</td><td>'+f2(x.ui)+'</td><td>'+f2(x.li)+'</td><td>'+f2(x.gap)+'</td><td>'+f2(x.ratio)+'</td><td>'+f2(x.share)+'</td><td>'+(x.yu==null?'-':f2(x.yu))+'</td><td>'+(x.yl==null?'-':f2(x.yl))+'</td></tr>');
+$('tbl1').innerHTML=h;
+const mx=k=>Math.max(...r.map(x=>x[k])),mn=k=>Math.min(...r.map(x=>x[k]));
+$('tbl2').innerHTML='<tr><th>สถิติ</th><th>'+D.gu+'</th><th>'+D.gl+'</th></tr>'+
+[['ค่าเฉลี่ย',D.su.m,D.sl.m],['ส่วนเบี่ยงเบนมาตรฐาน',D.su.s,D.sl.s],['ค่าต่ำสุด',mn('u'),mn('l')],['ค่าสูงสุด',mx('u'),mx('l')],['การเปลี่ยนแปลงรวม (%)',(L.ui-100),(L.li-100)],['CAGR ต่อช่วง (%)',D.cu,D.cl],['ดัชนีล่าสุด',L.ui,L.li]].map(a=>'<tr><td>'+a[0]+'</td><td>'+f2(a[1])+'</td><td>'+f2(a[2])+'</td></tr>').join('')+
+'<tr><td>สหสัมพันธ์ (Pearson r) ระหว่าง 2 กลุ่ม</td><td colspan="2">'+f2(D.corr)+'</td></tr><tr><td>ส่วนต่างดัชนีล่าสุด (จุด)</td><td colspan="2">'+f2(L.gap)+'</td></tr><tr><td>อัตราส่วน บน/ล่าง: ต้น → ปลาย</td><td colspan="2">'+f2(r[0].ratio)+' → '+f2(L.ratio)+'</td></tr>';
+$('expl').innerHTML='<li><b>ดัชนี</b> = ค่าแต่ละช่วง ÷ ค่าช่วงแรก × 100 ใช้เทียบกลุ่มที่หน่วยต่างกัน ถ้าดัชนี &gt; 100 แปลว่าสูงกว่าก่อนวิกฤต</li><li><b>ส่วนต่างดัชนี</b> = ดัชนีบน − ดัชนีล่าง ยิ่งเพิ่มขึ้นแสดงว่าสองขาของตัว K ยิ่งถ่างออก</li><li><b>อัตราส่วน บน/ล่าง</b> ที่สูงขึ้นแสดงความเหลื่อมล้ำเพิ่มขึ้น</li><li><b>CAGR</b> คืออัตราเติบโตเฉลี่ยต่อช่วงแบบทบต้น ('+n+' ช่วง)</li><li><b>Pearson r</b> ใกล้ +1 แปลว่าสองกลุ่มเคลื่อนไหวไปทางเดียวกัน ใกล้ −1 หรือต่ำ แปลว่าเคลื่อนไหวสวนทาง/ไม่สัมพันธ์ ซึ่งเป็นสัญญาณตัว K</li><li><b>เกณฑ์ตัดสิน:</b> ตัว K ชัดเจน = ดัชนีบน &gt; 105 และดัชนีล่าง &lt; 95 ณ ช่วงล่าสุด (เป็นเกณฑ์เชิงสำรวจ ไม่ใช่ข้อสรุปทางเศรษฐศาสตร์ที่เป็นทางการ)</li>';
+if(!noScroll)$('tcard').scrollIntoView({behavior:'smooth'})};
+async function dlTable(){const c=await html2canvas($('paper'),{backgroundColor:'#fff',scale:3});save(c.toDataURL('image/png'),'k-shaped-table.png')}
+function save(url,name){const a=document.createElement('a');a.href=url;a.download=name;a.click()}
+function dlXlsx(){const{r}=D;const wb=XLSX.utils.book_new();
+const a=[['ช่วงเวลา',D.gu,D.gl,'ดัชนีบน','ดัชนีล่าง','ส่วนต่างดัชนี','อัตราส่วนบน/ล่าง','สัดส่วนบน(%)','%เปลี่ยนแปลงบน','%เปลี่ยนแปลงล่าง']].concat(r.map(x=>[x.y,x.u,x.l,x.ui,x.li,x.gap,x.ratio,x.share,x.yu,x.yl]));
+XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a.map(w=>w.map(x=>tr(x)))),tr('ตารางข้อมูล'));
+const s=[['สถิติ',D.gu,D.gl],['ค่าเฉลี่ย',D.su.m,D.sl.m],['SD',D.su.s,D.sl.s],['CAGR(%)',D.cu,D.cl],['Pearson r',D.corr],['ผลวิเคราะห์',D.v],['ประเทศ',D.name]];
+XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(s.map(w=>w.map(x=>tr(x)))),tr('สถิติ'));XLSX.writeFile(wb,'k-shaped-analysis.xlsx')}
+
+const PAL=['#2563eb','#dc2626','#16a34a','#f59e0b','#8b5cf6','#0891b2','#db2777','#65a30d'];
+const white={id:'white',beforeDraw(c){const x=c.ctx;x.save();x.globalCompositeOperation='destination-over';x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.restore()}};
+const vals={id:'vals',afterDatasetsDraw(c){if(!c.options.plugins.vals||!c.options.plugins.vals.on)return;const x=c.ctx;x.save();x.fillStyle='#111';x.font='11px sans-serif';x.textAlign='center';
+c.data.datasets.forEach((d,i)=>{const m=c.getDatasetMeta(i);if(m.hidden)return;m.data.forEach((e,j)=>{let v=d.data[j];if(v&&typeof v==='object')v=v.y;if(v==null)return;
+const p=e.tooltipPosition?e.tooltipPosition():{x:e.x,y:e.y};x.fillText(f2(v),p.x,p.y-6)})});x.restore()}};
+function mk(title,cfg){title=tr(title);cfg=deepTr(cfg);const box=document.createElement('div');box.className='ch';
+box.innerHTML='<h3>'+title+'</h3><canvas></canvas><div class="row"><label><input type="checkbox"> แสดงตัวเลขบนกราฟ</label><button class="sec">⬇️ ดาวน์โหลด PNG</button></div>';
+$('charts').appendChild(box);
+cfg.plugins=(cfg.plugins||[]).concat([white,vals]);cfg.options=Object.assign({responsive:true,maintainAspectRatio:true,animation:false},cfg.options||{});
+cfg.options.plugins=Object.assign({vals:{on:false},legend:{labels:{color:'#222'}}},cfg.options.plugins||{});
+const ch=new Chart(box.querySelector('canvas'),cfg);charts.push(ch);
+box.querySelector('input').onchange=e=>{ch.options.plugins.vals.on=e.target.checked;ch.update()};
+box.querySelector('button').onclick=()=>{const r0=ch.options.devicePixelRatio;ch.options.devicePixelRatio=Math.max(3,Math.ceil(2000/ch.width));ch.resize();const url=ch.toBase64Image('image/png',1);ch.options.devicePixelRatio=r0;ch.resize();save(url,title.replace(/\s+/g,'_')+'.png')}}
+const sc=(t)=>({x:{ticks:{color:'#333'},grid:{color:'#eee'}},y:{ticks:{color:'#333'},grid:{color:'#eee'},title:t?{display:true,text:t,color:'#333'}:{}}});
+$('bg').onclick=()=>{if(!D)return;charts.forEach(c=>c.destroy());charts=[];$('charts').innerHTML='';$('gcard').classList.remove('hide');
+const{r,L}=D,lb=r.map(x=>x.y),A=D.gu,B=D.gl;
+mk('1. เส้นดัชนี (ฐาน=100): รูปตัว K',{type:'line',data:{labels:lb,datasets:[{label:A,data:r.map(x=>x.ui),borderColor:PAL[2],backgroundColor:PAL[2],tension:.25},{label:B,data:r.map(x=>x.li),borderColor:PAL[1],backgroundColor:PAL[1],tension:.25}]},options:{scales:sc('ดัชนี')}});
+mk('2. ค่าจริงของสองกลุ่ม (แท่งคู่)',{type:'bar',data:{labels:lb,datasets:[{label:A,data:r.map(x=>x.u),backgroundColor:PAL[2]},{label:B,data:r.map(x=>x.l),backgroundColor:PAL[1]}]},options:{scales:sc()}});
+mk('3. พื้นที่ส่วนต่างระหว่างสองขา',{type:'line',data:{labels:lb,datasets:[{label:A,data:r.map(x=>x.ui),borderColor:PAL[2],backgroundColor:'#16a34a33',fill:'+1'},{label:B,data:r.map(x=>x.li),borderColor:PAL[1],backgroundColor:'#dc262633',fill:false}]},options:{scales:sc('ดัชนี')}});
+mk('4. ส่วนต่างดัชนี (แท่ง)',{type:'bar',data:{labels:lb,datasets:[{label:'ส่วนต่างดัชนี',data:r.map(x=>x.gap),backgroundColor:PAL[0]}]},options:{scales:sc('จุด')}});
+mk('5. อัตราส่วน บน/ล่าง (เส้น)',{type:'line',data:{labels:lb,datasets:[{label:'อัตราส่วน',data:r.map(x=>x.ratio),borderColor:PAL[4],backgroundColor:PAL[4],stepped:true}]},options:{scales:sc('เท่า')}});
+mk('6. % เปลี่ยนแปลงรายช่วง',{type:'bar',data:{labels:lb.slice(1),datasets:[{label:A,data:r.slice(1).map(x=>x.yu),backgroundColor:PAL[2]},{label:B,data:r.slice(1).map(x=>x.yl),backgroundColor:PAL[1]}]},options:{scales:sc('%')}});
+mk('7. กระจาย: ค่ากลุ่มบน (X) กับกลุ่มล่าง (Y)',{type:'scatter',data:{datasets:[{label:'แต่ละช่วงเวลา',data:r.map(x=>({x:x.u,y:x.l})),backgroundColor:PAL[0],pointRadius:6}]},options:{scales:{x:{title:{display:true,text:A,color:'#333'}},y:{title:{display:true,text:B,color:'#333'}}}}});
+mk('8. เรดาร์ดัชนีรายช่วง',{type:'radar',data:{labels:lb,datasets:[{label:A,data:r.map(x=>x.ui),borderColor:PAL[2],backgroundColor:'#16a34a33'},{label:B,data:r.map(x=>x.li),borderColor:PAL[1],backgroundColor:'#dc262633'}]}});
+mk('9. สัดส่วนช่วงล่าสุด (โดนัท)',{type:'doughnut',data:{labels:[A,B],datasets:[{data:[L.u,L.l],backgroundColor:[PAL[2],PAL[1]]}]}});
+mk('10. สัดส่วนกลุ่มบนตลอดช่วง (%)',{type:'line',data:{labels:lb,datasets:[{label:'สัดส่วนกลุ่มบน (%)',data:r.map(x=>x.share),borderColor:PAL[3],backgroundColor:'#f59e0b33',fill:true,tension:.3}]},options:{scales:sc('%')}});
+if(!noScroll)$('gcard').scrollIntoView({behavior:'smooth'})};
+
+$('reset').onclick=()=>{charts.forEach(c=>c.destroy());charts=[];D=null;picked=null;
+['country','data'].forEach(i=>$(i).value='');$('gu').value=tr('กลุ่มรายได้สูง');$('gl').value=tr('กลุ่มรายได้ต่ำ');$('ind').selectedIndex=0;
+$('png').value='';$('pv').classList.add('hide');$('pv').removeAttribute('src');$('charts').innerHTML='';
+['out','tcard','gcard'].forEach(i=>i==='out'?$(i).classList.add('hide'):$(i).classList.add('hide'));$('msg').textContent='รีเซ็ตหน้าแล้ว';window.scrollTo({top:0,behavior:'smooth'})};
+
+/* ===== i18n TH/EN ===== */
+let lang='th',noScroll=false;const TT='วิเคราะห์การฟื้นตัวแบบตัว K (K-shaped Recovery)';
+const RAW={
+'วิเคราะห์การฟื้นตัวแบบตัว K (K-shaped Recovery)':'K-shaped Recovery Analysis',
+'เปรียบเทียบกลุ่มที่ฟื้นตัวขึ้น (ขาบนของตัว K) กับกลุ่มที่ตกต่ำลง (ขาล่างของตัว K) หลังวิกฤต':'Compare the group that recovers (upper arm of the K) with the group that declines (lower arm of the K) after a crisis',
+'1) ข้อมูลนำเข้า':'1) Input data',
+'ประเทศที่ใช้วิเคราะห์ (พิมพ์ตัวอักษรแรกเพื่อค้นหา)':'Country for analysis (type the first letter to search)',
+'เช่น ไ → ไทย, U → United States':'e.g. T → Thailand, U → United States',
+'ตัวชี้วัด':'Indicator','รายได้เฉลี่ยต่อเดือน':'Average monthly income','ความมั่งคั่ง/ทรัพย์สิน':'Wealth / assets','การบริโภคต่อคน':'Consumption per capita','ผลตอบแทนธุรกิจ/ยอดขาย':'Business returns / sales','การจ้างงาน (ดัชนี)':'Employment (index)','อื่น ๆ':'Other',
+'ชื่อกลุ่มขาบน (ฟื้นตัว)':'Upper-arm group name (recovering)','ชื่อกลุ่มขาล่าง (ตกต่ำ)':'Lower-arm group name (declining)',
+'ข้อมูล (1 บรรทัด = ป้ายปี/ช่วงเวลา, ค่ากลุ่มขาบน, ค่ากลุ่มขาล่าง คั่นด้วยจุลภาค/ช่องว่าง/แท็บ; ใส่ได้ตั้งแต่ 3 บรรทัด)':'Data (one line = period label, upper-group value, lower-group value, separated by comma/space/tab; at least 3 lines)',
+'🧪 ทดลองข้อมูลตัวอย่าง':'🧪 Try sample data','🖼️ แนบไฟล์ PNG':'🖼️ Attach PNG file','⚙️ ประมวลผลข้อมูล':'⚙️ Process data','🔄 Reset หน้า':'🔄 Reset page',
+'2) เลือกรูปแบบการแสดงผล':'2) Choose display format','📋 ประมวลผลตาราง':'📋 Process table','📊 แสดงผลเป็นกราฟ':'📊 Show as charts','ตารางสถิติวิเคราะห์':'Statistical analysis table','⬇️ ดาวน์โหลดตาราง PNG':'⬇️ Download table as PNG','⬇️ ดาวน์โหลด Excel':'⬇️ Download Excel','กราฟวิเคราะห์':'Analysis charts',
+'มีรายชื่อประเทศ/ดินแดน ':'Countries/territories available: ',' รายการ':' items',
+'โหลดข้อมูลตัวอย่างแล้ว (ข้อมูลสมมติ) กดประมวลผลได้เลย':'Sample data loaded (fictional). You can process it now.',
+'⚠️ กรุณาเลือกประเทศจากรายการที่เด้งขึ้นมา':'⚠️ Please choose a country from the suggestion list',
+'⚠️ ต้องมีข้อมูลอย่างน้อย 3 บรรทัด (ป้าย, ค่ากลุ่มบน, ค่ากลุ่มล่าง) และค่าต้องเป็นตัวเลขมากกว่า 0':'⚠️ At least 3 lines are required (label, upper value, lower value) and values must be numbers greater than 0',
+'⚠️ ค่าต้องมากกว่า 0':'⚠️ Values must be greater than 0',
+'✅ ประมวลผลข้อมูลสำเร็จ เลือกแสดงเป็นตารางหรือกราฟด้านล่าง':'✅ Processed successfully. Choose table or charts below',
+'รีเซ็ตหน้าแล้ว':'Page has been reset',
+'✅ เข้าข่ายการฟื้นตัวแบบตัว K ชัดเจน':'✅ Clearly fits a K-shaped recovery','กลุ่มบนสูงกว่าฐาน แต่กลุ่มล่างต่ำกว่าฐาน':'The upper group is above the base level while the lower group is below it',
+'⚠️ แยกทางกันบางส่วน (คล้าย K แบบอ่อน)':'⚠️ Partial divergence (a mild K-shape)','ทั้งสองกลุ่มเพิ่มขึ้น แต่กลุ่มบนโตเร็วกว่ามาก':'Both groups rose, but the upper group grew much faster',
+'❌ ไม่ใช่ตัว K (ทั้งสองกลุ่มยังต่ำกว่าฐาน)':'❌ Not a K-shape (both groups remain below the base level)','เข้าข่ายการฟื้นตัวช้า/แบบ L มากกว่า':'More consistent with a slow or L-shaped recovery',
+'❌ ไม่เข้าข่ายตัว K':'❌ Does not fit a K-shape','ช่องว่างระหว่างกลุ่มไม่ถ่างออกมากพอ':'The gap between the groups has not widened enough',
+'ประเทศ: ':'Country: ',' | ฐาน = ':' | Base = ',' (ดัชนี=100)':' (index = 100)','ประเทศ':'Country',
+'ช่วงเวลา':'Period','ดัชนีบน':'Upper index','ดัชนีล่าง':'Lower index','ส่วนต่างดัชนี':'Index gap','อัตราส่วน บน/ล่าง':'Upper/Lower ratio','อัตราส่วนบน/ล่าง':'Upper/Lower ratio','สัดส่วนบน (%)':'Upper share (%)','สัดส่วนบน(%)':'Upper share (%)','% เปลี่ยนแปลงบน':'% change (upper)','% เปลี่ยนแปลงล่าง':'% change (lower)','%เปลี่ยนแปลงบน':'% change (upper)','%เปลี่ยนแปลงล่าง':'% change (lower)',
+'สถิติ':'Statistic','ค่าเฉลี่ย':'Mean','ส่วนเบี่ยงเบนมาตรฐาน':'Standard deviation','ค่าต่ำสุด':'Minimum','ค่าสูงสุด':'Maximum','การเปลี่ยนแปลงรวม (%)':'Total change (%)','CAGR ต่อช่วง (%)':'CAGR per period (%)','ดัชนีล่าสุด':'Latest index',
+'สหสัมพันธ์ (Pearson r) ระหว่าง 2 กลุ่ม':'Correlation (Pearson r) between the 2 groups','ส่วนต่างดัชนีล่าสุด (จุด)':'Latest index gap (points)','อัตราส่วน บน/ล่าง: ต้น → ปลาย':'Upper/Lower ratio: start → end',
+'ดัชนี':'Index',' = ค่าแต่ละช่วง ÷ ค่าช่วงแรก × 100 ใช้เทียบกลุ่มที่หน่วยต่างกัน ถ้าดัชนี > 100 แปลว่าสูงกว่าก่อนวิกฤต':' = value in each period ÷ value in the first period × 100, used to compare groups with different units. An index above 100 means above the pre-crisis level',
+' = ดัชนีบน − ดัชนีล่าง ยิ่งเพิ่มขึ้นแสดงว่าสองขาของตัว K ยิ่งถ่างออก':' = upper index − lower index. The larger it gets, the wider the two arms of the K spread apart',
+'ที่สูงขึ้นแสดงความเหลื่อมล้ำเพิ่มขึ้น':'rising means inequality is increasing',
+'คืออัตราเติบโตเฉลี่ยต่อช่วงแบบทบต้น (':'is the compound average growth rate per period (',' ช่วง)':' periods)',
+'ใกล้ +1 แปลว่าสองกลุ่มเคลื่อนไหวไปทางเดียวกัน ใกล้ −1 หรือต่ำ แปลว่าเคลื่อนไหวสวนทาง/ไม่สัมพันธ์ ซึ่งเป็นสัญญาณตัว K':'close to +1 means the two groups move together; close to −1 or low means they move in opposite directions or are unrelated, which is a K-shape signal',
+'เกณฑ์ตัดสิน:':'Criterion:','ตัว K ชัดเจน = ดัชนีบน > 105 และดัชนีล่าง < 95 ณ ช่วงล่าสุด (เป็นเกณฑ์เชิงสำรวจ ไม่ใช่ข้อสรุปทางเศรษฐศาสตร์ที่เป็นทางการ)':'clearly K-shaped = upper index > 105 and lower index < 95 in the latest period (an exploratory threshold, not a formal economic conclusion)',
+'1. เส้นดัชนี (ฐาน=100): รูปตัว K':'1. Index lines (base = 100): the K shape','2. ค่าจริงของสองกลุ่ม (แท่งคู่)':'2. Actual values of both groups (paired bars)','3. พื้นที่ส่วนต่างระหว่างสองขา':'3. Area of the gap between the two arms','4. ส่วนต่างดัชนี (แท่ง)':'4. Index gap (bars)','5. อัตราส่วน บน/ล่าง (เส้น)':'5. Upper/Lower ratio (line)','6. % เปลี่ยนแปลงรายช่วง':'6. % change per period','7. กระจาย: ค่ากลุ่มบน (X) กับกลุ่มล่าง (Y)':'7. Scatter: upper group (X) vs lower group (Y)','8. เรดาร์ดัชนีรายช่วง':'8. Radar of index by period','9. สัดส่วนช่วงล่าสุด (โดนัท)':'9. Share in the latest period (doughnut)','10. สัดส่วนกลุ่มบนตลอดช่วง (%)':'10. Upper-group share over time (%)',
+'แสดงตัวเลขบนกราฟ':'Show values on chart','⬇️ ดาวน์โหลด PNG':'⬇️ Download PNG','แต่ละช่วงเวลา':'Each period','อัตราส่วน':'Ratio','สัดส่วนกลุ่มบน (%)':'Upper-group share (%)','เท่า':'times','จุด':'points',
+'กลุ่มรายได้สูง':'High-income group','กลุ่มรายได้ต่ำ':'Low-income group','กลุ่มบน':'Upper group','กลุ่มล่าง':'Lower group','ตารางข้อมูล':'Data table','ผลวิเคราะห์':'Result'};
+const DICT=Object.entries(RAW).sort((a,b)=>b[0].length-a[0].length);
+function tr(s){if(lang!=='en'||typeof s!=='string')return s;for(const[a,b]of DICT)if(s.includes(a))s=s.split(a).join(b);return s}
+const deepTr=o=>typeof o==='string'?tr(o):Array.isArray(o)?o.map(deepTr):(o&&o.constructor===Object)?Object.fromEntries(Object.entries(o).map(([k,v])=>[k,deepTr(v)])):o;
+function nm(x){return lang==='en'?x.e:x.t+' ('+x.e+')'}
+const orig=new WeakMap();
+function applyLang(){const w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let n;
+while(n=w.nextNode()){const p=n.parentNode;if(p&&/^(SCRIPT|STYLE)$/.test(p.nodeName))continue;let o=orig.get(n);
+if(o===undefined){if(!/[\u0E00-\u0E7F]/.test(n.nodeValue))continue;o=n.nodeValue;orig.set(n,o)}
+const v=lang==='en'?tr(o):o;if(n.nodeValue!==v)n.nodeValue=v}
+document.querySelectorAll('[placeholder]').forEach(e=>{if(e.dataset.ph===undefined)e.dataset.ph=e.placeholder;e.placeholder=lang==='en'?tr(e.dataset.ph):e.dataset.ph});
+document.documentElement.lang=lang;document.title=lang==='en'?tr(TT):TT}
+const OPT={childList:true,subtree:true,characterData:true};
+const obs=new MutationObserver(()=>{obs.disconnect();applyLang();obs.observe(document.body,OPT)});
+function setLang(l){lang=l;
+[['gu','กลุ่มรายได้สูง','High-income group'],['gl','กลุ่มรายได้ต่ำ','Low-income group']].forEach(([i,t,e])=>{const el=$(i);if(el.value===t||el.value===e)el.value=l==='en'?e:t});
+if(picked)inp.value=nm(picked);
+$('lth').classList.toggle('act',l==='th');$('len').classList.toggle('act',l==='en');
+obs.disconnect();applyLang();
+if(D){D.gu=$('gu').value||'กลุ่มบน';D.gl=$('gl').value||'กลุ่มล่าง';D.ind=$('ind').value;if(D.pk)D.name=nm(D.pk);
+noScroll=true;if(!$('tcard').classList.contains('hide'))$('bt').click();if(!$('gcard').classList.contains('hide'))$('bg').click();noScroll=false;applyLang()}
+obs.observe(document.body,OPT)}
+$('lth').onclick=()=>setLang('th');$('len').onclick=()=>setLang('en');
+obs.observe(document.body,OPT);
+</script>
+</body>
+</html>
